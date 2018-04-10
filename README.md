@@ -1,3 +1,9 @@
+# Vetur E
+
+This is a branch of Vetur, adding a setting (vetur.extensions) to the original one. Used to turn on syntax services for vue files that have been changed to other extensions.
+
+Please do not install and use Vetur E and Vetur at the same time.
+
 # Vetur
 
 [![](https://vsmarketplacebadge.apphb.com/version-short/octref.vetur.svg?style=flat-square)](https://marketplace.visualstudio.com/items?itemName=octref.vetur)
