@@ -1,5 +1,22 @@
 # FAQ
 
+## Install an old version of Vetur
+
+Sometimes new releases have bugs that you want to avoid. Here's an easy way to downgrade Vetur to a working version:
+
+- Set `"extensions.autoUpdate": false`.
+- Find the version you want and download VSIX https://github.com/vuejs/vetur/blob/master/CHANGELOG.md.
+- Install VSIX following this guide: https://code.visualstudio.com/docs/editor/extension-gallery#_install-from-a-vsix.
+
+## No Syntax Highlighting & No Language Features working
+
+This is probably caused by VS Code not installing Vetur properly. Try these methods:
+
+- Run command: `Developer: Reinstall Extension` for Vetur.
+- Remove Vetur in your [extensions folder](https://code.visualstudio.com/docs/editor/extension-gallery#_common-questions) and do a clean reinstall.
+- (Windows): Try reinstall Vetur with admin permission.
+- If nothing above works, download the [latest pre-packaged vsix file](https://github.com/vuejs/vetur/releases) and [install through vsix](https://code.visualstudio.com/docs/editor/extension-gallery#_install-from-a-vsix).
+
 ## Vetur Crash
 
 - If it says `cannot find module <some-module>`, go to Vetur's client code installation directory and run `yarn` or `npm install`.
@@ -33,6 +50,7 @@
   // tsconfig.json
   {
     "compilerOptions": {
+      "baseUrl": ".",
       "paths": {
         "@/*": [
           "src/*"
@@ -42,18 +60,29 @@
   }
   ```
 
+## Vetur cannot recognize my Vue component import, such as `import Comp from './comp'`
+
 - You need to add `.vue` extension when importing SFC.
 
-More details at: https://github.com/vuejs/vetur/issues/423
+More details at: https://github.com/vuejs/vetur/issues/423#issuecomment-340235722
 
 ## .vue file cannot be imported in TS file.
 
 You need to add `declare module '*.vue'` in your dts files: https://github.com/Microsoft/TypeScript-Vue-Starter#single-file-components.
 
-## Formatting doesn't work in template section.
+## Install from source.
 
-Vetur by default does **not** format html.  
-See https://github.com/vuejs/vetur/blob/master/CHANGELOG.md#vetur-formatting-changes for more detail.
+To build and install the extension from source, you need to install [`vsce`](https://code.visualstudio.com/docs/extensions/publish-extension).
 
-If template still gets no formatting after enabling js-beautify, it is probably caused by [prettier-vscode](https://github.com/prettier/prettier-vscode) extension.  
-You can disable it for Vue: https://github.com/prettier/prettier-vscode#prettierdisablelanguages-default-
+Then, clone the repository and compile it.
+
+```
+git clone https://github.com/vuejs/vetur
+cd vetur
+yarn 
+cd server && yarn && yarn compile 
+cd ../ && yarn compile 
+vsce package
+```
+  
+Now you'll find `vetur-{version}.vsix`, you can install it by editor command "Install from VSIX".

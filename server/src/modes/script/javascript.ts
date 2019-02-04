@@ -34,7 +34,8 @@ import Uri from 'vscode-uri';
 import * as ts from 'typescript';
 import * as _ from 'lodash';
 
-import { nullMode, NULL_SIGNATURE, NULL_COMPLETION } from '../nullMode';
+import { nullMode, NULL_SIGNATURE } from '../nullMode';
+import { VLSFormatConfig } from '../../config';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
 // https://microsoft.github.io/language-server-protocol/specification#completion-request-leftwards_arrow_with_hook
@@ -49,7 +50,10 @@ export function getJavascriptMode(
   workspacePath: string | null | undefined
 ): ScriptMode {
   if (!workspacePath) {
-    return { ...nullMode, findComponents: () => [] };
+    return {
+      ...nullMode,
+      findComponents: () => []
+    };
   }
   const jsDocuments = getLanguageModelCache(10, 60, document => {
     const vueDocument = documentRegions.get(document);
@@ -62,7 +66,7 @@ export function getJavascriptMode(
   });
 
   const serviceHost = getServiceHost(workspacePath, jsDocuments);
-  const { updateCurrentTextDocument, getScriptDocByFsPath } = serviceHost;
+  const { updateCurrentTextDocument } = serviceHost;
   let config: any = {};
 
   return {
@@ -144,7 +148,7 @@ export function getJavascriptMode(
     doResolve(doc: TextDocument, item: CompletionItem): CompletionItem {
       const { service } = updateCurrentTextDocument(doc);
       if (!languageServiceIncludesFile(service, doc.uri)) {
-        return NULL_COMPLETION;
+        return item;
       }
 
       const fileFsPath = getFileFsPath(doc.uri);
@@ -188,7 +192,7 @@ export function getJavascriptMode(
       }
       return { contents: [] };
     },
-    doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
+    doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp | null {
       const { scriptDoc, service } = updateCurrentTextDocument(doc);
       if (!languageServiceIncludesFile(service, doc.uri)) {
         return NULL_SIGNATURE;
@@ -303,9 +307,11 @@ export function getJavascriptMode(
 
       const definitionResults: Definition = [];
       const program = service.getProgram();
+      if (!program) {
+        return null;
+      }
       definitions.forEach(d => {
-        const sourceFile = program.getSourceFile(d.fileName)!;
-        const definitionTargetDoc = TextDocument.create(d.fileName, 'vue', 0, sourceFile.getFullText());
+        const definitionTargetDoc = getSourceDoc(d.fileName, program);
         definitionResults.push({
           uri: Uri.file(d.fileName).toString(),
           range: convertRange(definitionTargetDoc, d.textSpan)
@@ -326,8 +332,12 @@ export function getJavascriptMode(
       }
 
       const referenceResults: Location[] = [];
+      const program = service.getProgram();
+      if (!program) {
+        return [];
+      }
       references.forEach(r => {
-        const referenceTargetDoc = getScriptDocByFsPath(fileFsPath);
+        const referenceTargetDoc = getSourceDoc(r.fileName, program);
         if (referenceTargetDoc) {
           referenceResults.push({
             uri: Uri.file(r.fileName).toString(),
@@ -349,21 +359,27 @@ export function getJavascriptMode(
         return [];
       }
 
-      const needIndent = config.vetur.format.scriptInitialIndent;
       const parser = scriptDoc.languageId === 'javascript' ? 'babylon' : 'typescript';
-      if (defaultFormatter === 'prettier') {
+      const needInitialIndent = config.vetur.format.scriptInitialIndent;
+      const vlsFormatConfig: VLSFormatConfig = config.vetur.format;
+
+      if (defaultFormatter === 'prettier' || defaultFormatter === 'prettier-eslint') {
         const code = scriptDoc.getText();
         const filePath = getFileFsPath(scriptDoc.uri);
-        if (config.prettier.eslintIntegration) {
-          return prettierEslintify(code, filePath, range, needIndent, formatParams, config.prettier, parser);
-        } else {
-          return prettierify(code, filePath, range, needIndent, formatParams, config.prettier, parser);
-        }
-      } else {
-        const initialIndentLevel = needIndent ? 1 : 0;
+
+        return defaultFormatter === 'prettier'
+          ? prettierify(code, filePath, range, vlsFormatConfig, parser, needInitialIndent)
+          : prettierEslintify(code, filePath, range, vlsFormatConfig, parser, needInitialIndent);
+      }
+      
+      else {
+        const initialIndentLevel = needInitialIndent ? 1 : 0;
         const formatSettings: ts.FormatCodeSettings =
           scriptDoc.languageId === 'javascript' ? config.javascript.format : config.typescript.format;
-        const convertedFormatSettings = convertOptions(formatSettings, formatParams, initialIndentLevel);
+        const convertedFormatSettings = convertOptions(formatSettings, {
+          tabSize: vlsFormatConfig.options.tabSize,
+          insertSpaces: !vlsFormatConfig.options.useTabs
+        }, initialIndentLevel);
 
         const fileFsPath = getFileFsPath(doc.uri);
         const start = scriptDoc.offsetAt(range.start);
@@ -393,6 +409,9 @@ export function getJavascriptMode(
     onDocumentRemoved(document: TextDocument) {
       jsDocuments.onDocumentRemoved(document);
     },
+    onDocumentChanged(filePath: string) {
+      serviceHost.updateExternalDocument(filePath);
+    },
     dispose() {
       serviceHost.dispose();
       jsDocuments.dispose();
@@ -400,8 +419,13 @@ export function getJavascriptMode(
   };
 }
 
+function getSourceDoc(fileName: string, program: ts.Program): TextDocument {
+  const sourceFile = program.getSourceFile(fileName)!;
+  return TextDocument.create(fileName, 'vue', 0, sourceFile.getFullText());
+}
+
 function languageServiceIncludesFile(ls: ts.LanguageService, documentUri: string): boolean {
-  const filePaths = ls.getProgram().getRootFileNames();
+  const filePaths = ls.getProgram()!.getRootFileNames();
   const filePath = getFilePath(documentUri);
   return filePaths.includes(filePath);
 }

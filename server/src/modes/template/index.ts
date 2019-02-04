@@ -1,9 +1,9 @@
+import * as _ from 'lodash';
+
 import { LanguageModelCache, getLanguageModelCache } from '../languageModelCache';
-import { DocumentContext } from '../../service';
 import { TextDocument, Position, Range, FormattingOptions } from 'vscode-languageserver-types';
 import { LanguageMode } from '../languageModes';
 import { VueDocumentRegions } from '../embeddedSupport';
-
 import { HTMLDocument } from './parser/htmlParser';
 import { doComplete } from './services/htmlCompletion';
 import { doHover } from './services/htmlHover';
@@ -17,8 +17,8 @@ import { findDefinition } from './services/htmlDefinition';
 import { getTagProviderSettings } from './tagProviders';
 import { ScriptMode } from '../script/javascript';
 import { getComponentTags, getEnabledTagProviders } from './tagProviders';
-
-import * as _ from 'lodash';
+import { DocumentContext } from '../../types';
+import { VLSFormatConfig } from '../../config';
 
 type DocumentRegionCache = LanguageModelCache<VueDocumentRegions>;
 
@@ -71,10 +71,7 @@ export function getVueHTMLMode(
       return findDocumentSymbols(document, vueDocuments.get(document));
     },
     format(document: TextDocument, range: Range, formattingOptions: FormattingOptions) {
-      if (config.vetur.format.defaultFormatter.html === 'none') {
-        return [];
-      }
-      return htmlFormat(document, range, formattingOptions, config);
+      return htmlFormat(document, range, config.vetur.format as VLSFormatConfig);
     },
     findDefinition(document: TextDocument, position: Position) {
       const embedded = embeddedDocuments.get(document);

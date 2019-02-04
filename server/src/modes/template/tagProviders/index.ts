@@ -2,12 +2,21 @@ import { IHTMLTagProvider } from './common';
 import { getHTML5TagProvider } from './htmlTags';
 import { getVueTagProvider } from './vueTags';
 import { getRouterTagProvider } from './routerTags';
-import { elementTagProvider, onsenTagProvider, bootstrapTagProvider, vuetifyTagProvider } from './externalTagProviders';
+import {
+  elementTagProvider,
+  onsenTagProvider,
+  bootstrapTagProvider,
+  buefyTagProvider,
+  vuetifyTagProvider,
+  getRuntimeTagProvider
+} from './externalTagProviders';
 export { getComponentTags } from './componentTags';
 export { IHTMLTagProvider } from './common';
 
 import * as ts from 'typescript';
 import * as fs from 'fs';
+import { join } from 'path';
+import { getNuxtTagProvider } from './nuxtTags';
 
 export let allTagProviders: IHTMLTagProvider[] = [
   getHTML5TagProvider(),
@@ -16,6 +25,7 @@ export let allTagProviders: IHTMLTagProvider[] = [
   elementTagProvider,
   onsenTagProvider,
   bootstrapTagProvider,
+  buefyTagProvider,
   vuetifyTagProvider
 ];
 
@@ -31,14 +41,17 @@ export function getTagProviderSettings(workspacePath: string | null | undefined)
     element: false,
     onsen: false,
     bootstrap: false,
-    vuetify: false
+    buefy: false,
+    vuetify: false,
+    quasar: false,
+    nuxt: false
   };
   if (!workspacePath) {
     return settings;
   }
   try {
     const packagePath = ts.findConfigFile(workspacePath, ts.sys.fileExists, 'package.json');
-    if(!packagePath) {
+    if (!packagePath) {
       return settings;
     }
     const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
@@ -54,8 +67,47 @@ export function getTagProviderSettings(workspacePath: string | null | undefined)
     if (packageJson.dependencies['bootstrap-vue']) {
       settings['bootstrap'] = true;
     }
+    if (packageJson.dependencies['buefy']) {
+      settings['buefy'] = true;
+    }
     if (packageJson.dependencies['vuetify']) {
       settings['vuetify'] = true;
+    }
+    if (
+      packageJson.dependencies['nuxt'] ||
+      packageJson.dependencies['nuxt-legacy'] ||
+      packageJson.dependencies['nuxt-edge']
+    ) {
+      const nuxtTagProvider = getNuxtTagProvider(workspacePath);
+      if (nuxtTagProvider) {
+        settings['nuxt'] = true;
+        allTagProviders.push(nuxtTagProvider);
+      }
+    }
+
+    for (const dep in packageJson.dependencies) {
+      const runtimePkgPath = ts.findConfigFile(
+        workspacePath,
+        ts.sys.fileExists,
+        join('node_modules', dep, 'package.json')
+      );
+
+      if (!runtimePkgPath) {
+        continue;
+      }
+
+      const runtimePkg = JSON.parse(fs.readFileSync(runtimePkgPath, 'utf-8'));
+      if (!runtimePkg) {
+        continue;
+      }
+
+      const tagProvider = getRuntimeTagProvider(workspacePath, runtimePkg);
+      if (!tagProvider) {
+        continue;
+      }
+
+      allTagProviders.push(tagProvider);
+      settings[dep] = true;
     }
   } catch (e) {}
   return settings;

@@ -13,12 +13,11 @@ import {
   CompletionList,
   Position,
   FormattingOptions,
-  SymbolInformation
+  SymbolInformation,
+  ColorInformation,
+  Color,
+  ColorPresentation
 } from 'vscode-languageserver-types';
-import {
-  Color, ColorInformation, ColorPresentation
-} from 'vscode-languageserver-protocol/lib/protocol.colorProvider.proposed';
-import { DocumentContext } from '../service';
 
 import { getLanguageModelCache, LanguageModelCache } from './languageModelCache';
 import { getDocumentRegions, VueDocumentRegions } from './embeddedSupport';
@@ -26,8 +25,8 @@ import { getVueMode } from './vue';
 import { getCSSMode, getSCSSMode, getLESSMode, getPostCSSMode } from './style';
 import { getJavascriptMode } from './script/javascript';
 import { getVueHTMLMode } from './template';
-
 import { getStylusMode } from './style/stylus';
+import { DocumentContext } from '../types';
 
 export interface LanguageMode {
   getId(): string;
@@ -36,7 +35,7 @@ export interface LanguageMode {
   doComplete?(document: TextDocument, position: Position): CompletionList;
   doResolve?(document: TextDocument, item: CompletionItem): CompletionItem;
   doHover?(document: TextDocument, position: Position): Hover;
-  doSignatureHelp?(document: TextDocument, position: Position): SignatureHelp;
+  doSignatureHelp?(document: TextDocument, position: Position): SignatureHelp | null;
   findDocumentHighlight?(document: TextDocument, position: Position): DocumentHighlight[];
   findDocumentSymbols?(document: TextDocument): SymbolInformation[];
   findDocumentLinks?(document: TextDocument, documentContext: DocumentContext): DocumentLink[];
@@ -46,6 +45,7 @@ export interface LanguageMode {
   findDocumentColors?(document: TextDocument): ColorInformation[];
   getColorPresentations?(document: TextDocument, color: Color, range: Range): ColorPresentation[];
 
+  onDocumentChanged?(filePath: string): void;
   onDocumentRemoved(document: TextDocument): void;
   dispose(): void;
 }
